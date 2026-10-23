@@ -1,0 +1,26 @@
+# Local development and editor settings
+.localdev/
+.vscode/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# Maven and Gradle build output
+target/
+build/
+.gradle/
+out/
+*.class
+
+# Local configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
