@@ -2,6 +2,8 @@
 
 ATOR is a Burp Suite extension that obtains tokens from a recorded macro and replaces them in later requests. It covers access and refresh tokens in headers, cookies, the URL, and XML, JSON, or form bodies.
 
+For setup, workflows, and the Burp MCP tool and command reference, see [USAGE.md](USAGE.md).
+
 Version 2.5 adds an activity log and a Repeater label regex to the Montoya HTTP path and domain controls introduced in 2.4.2.
 
 The original idea comes from [ExtendedMacro](https://github.com/FrUh/ExtendedMacro).
@@ -81,7 +83,7 @@ burp-mcp has no separate ATOR invoke API. Send a normal request with `send_http1
 | `import` | ATOR export JSON | Loads error conditions, obtain steps, and replacement rules on the Swing thread. The response is a `status` snapshot without extraction values. A `domains` array in the document replaces the domain list. |
 | `domains` | JSON array, `{"domains":[...]}`, or one host per line | Replaces the domain list. `{"domains":[]}` handles every host. `{"enabled":false}` keeps the saved hosts and handles every host. The response is a `status` snapshot without extraction values. |
 
-Unknown commands return HTTP 400. A failed command returns HTTP 500 with `{ "ok": false, "error": "..." }`. Responses use `Content-Type: application/json` and `X-ATOR: 1`.
+Unknown commands return HTTP 400, and command exceptions return HTTP 500. Some invalid bodies return HTTP 200 with `{ "ok": false, "error": "..." }`, so check `ok` as well as the HTTP status. Responses use `Content-Type: application/json` and `X-ATOR: 1`.
 
 `status` fields:
 
@@ -92,7 +94,7 @@ Unknown commands return HTTP 400. A failed command returns HTTP 500 with `{ "ok"
 - `obtainSteps`, `replacements`, `errorConditions`
 - `commandHeader`, `commands`
 
-Example status call. The host is unused because the request is answered inside the extension:
+Example status call. ATOR answers it inside the extension, though Burp MCP can still check its target host permission first:
 
 ```http
 GET /ator HTTP/1.1
