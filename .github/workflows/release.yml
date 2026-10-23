@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+)*$ ]]
-          source="target/ATOR-${RELEASE_TAG}-jar-with-dependencies.jar"
+          source=".localdev/target/ATOR-${RELEASE_TAG}-jar-with-dependencies.jar"
           test -s "$source"
           jar tf "$source" > "$RUNNER_TEMP/ator-jar-contents.txt"
           grep -Fxq 'burp/BurpExtender.class' "$RUNNER_TEMP/ator-jar-contents.txt"

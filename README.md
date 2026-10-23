@@ -139,22 +139,22 @@ Requirements:
 mvn clean package
 ```
 
-Load `bin/ATOR-v2.5.jar` in **Extensions > Add > Java**. The same build is available in `target/` as a JAR with dependencies. `BappManifest.bmf` names the extension **Authentication Token Obtain and Replace**, screen version `2.5`, and lists the BApp entry point as `bin/ATOR-v2.5.jar`.
+Load `.localdev/target/ATOR-v2.5-jar-with-dependencies.jar` in **Extensions > Add > Java** after building. Maven keeps compiled classes and JARs in the ignored `.localdev/target/` folder. `BappManifest.bmf` names the extension **Authentication Token Obtain and Replace**, screen version `2.5`, and points to that generated JAR.
 
-`mvn clean install` matches the manifest `BuildCommand` and also installs the artifact locally.
+`mvn clean package` is also the manifest `BuildCommand`.
 
 ### GitHub Releases
 
-Pushing a version tag such as `v2.5` runs [the release workflow](.github/workflows/release.yml). GitHub checks out that tag, compiles with Java 17, builds the Maven `jar-with-dependencies` artifact, and publishes `ATOR-v2.5.jar` plus its SHA-256 file in the repository's Releases section. The workflow checks that the tag matches the version in `pom.xml` by requiring the corresponding Maven artifact name; a mismatch stops the release.
+Pushing a version tag runs [the release workflow](.github/workflows/release.yml). GitHub checks out that tag, compiles with Java 17 into `.localdev/target/`, and publishes `ATOR-<tag>.jar` plus its SHA-256 file in the repository's Releases section. The workflow checks that the tag matches the version in `pom.xml` by requiring the corresponding Maven artifact name; a mismatch stops the release. [The v2.5 JAR is already available](https://github.com/0xdhanesh/ATOR-Rewamped/releases/tag/v2.5).
 
-Commit and merge the release source and workflow first, then tag that commit and push the tag:
+For the next version, update the version in the POM, source, and manifest, merge the release source, then tag that commit and push the tag. For example, for v2.6:
 
 ```bash
-git tag v2.5
-git push origin v2.5
+git tag v2.6
+git push origin v2.6
 ```
 
-For later releases, update `pom.xml`, `BurpExtender.VERSION`, and `BappManifest.bmf` before creating the next tag. The GitHub Release JAR is compiled from the tagged source; it does not reuse a checked-in `bin/` JAR.
+The GitHub Release JAR is compiled from tagged source. Compiled JARs stay out of Git.
 
 ## Configure ATOR
 

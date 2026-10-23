@@ -8,6 +8,6 @@ MinPlatformVersion: 0
 ProOnly: False
 Author: Synopsys-Sig
 ShortDescription: Helps automated scanning accessing/refreshing tokens, replacing tokens in XML and JSON body,replacing tokens in cookies.
-EntryPoint: bin/ATOR-v2.5.jar
-BuildCommand: mvn clean install
+EntryPoint: .localdev/target/ATOR-v2.5-jar-with-dependencies.jar
+BuildCommand: mvn clean package
 SupportedProducts: Pro, Community
