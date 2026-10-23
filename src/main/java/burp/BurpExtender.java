@@ -12,7 +12,7 @@ import java.util.List;
 public class BurpExtender implements BurpExtension, IBurpExtender, IContextMenuFactory, ITab {
 	
 	
-    public static final String VERSION = "2.4.2";
+    public static final String VERSION = "2.5";
     private static final String EXTENSION_NAME = "ATOR v" + VERSION;
     private static final String EXTENSION_NAME_TAB_NAME = EXTENSION_NAME;
     public static SpotErrorMetaData spoterroMetaData = null;;
@@ -101,6 +101,7 @@ public class BurpExtender implements BurpExtension, IBurpExtender, IContextMenuF
 		
 		mainTabbedPane.add("ATOR Configuration", atorconfigurationPane);
 		mainTabbedPane.add("Settings", setttingsTab.initSettingsGui());
+		mainTabbedPane.add("Activity", AtorActivityLog.createPanel());
 		return mainTabbedPane;
 	}
 

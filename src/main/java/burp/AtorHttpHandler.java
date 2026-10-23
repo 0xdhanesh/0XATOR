@@ -11,6 +11,8 @@ import burp.api.montoya.http.handler.ResponseReceivedAction;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Live ATOR hook for every Burp tool, including requests that burp-mcp sends
  * through {@code api.http().sendRequest} (tool type Extensions).
@@ -24,6 +26,8 @@ import burp.api.montoya.http.message.responses.HttpResponse;
 public final class AtorHttpHandler implements HttpHandler {
     static final String COMMAND_HEADER = "X-ATOR-Command";
     static final String MACRO_HEADER = "X-ATOR-Macro";
+    private static final ConcurrentHashMap<Integer, String> REPEATER_DECISIONS = new ConcurrentHashMap<>();
+    private static final String ALLOWED = "Allowed";
 
     private static final ThreadLocal<Integer> DEPTH = ThreadLocal.withInitial(() -> 0);
 
@@ -51,31 +55,62 @@ public final class AtorHttpHandler implements HttpHandler {
                 HttpRequest stripped = request.hasHeader(MACRO_HEADER)
                         ? request.withRemovedHeader(MACRO_HEADER)
                         : request;
+                if (stripped.hasHeader(RepeaterLabelFilter.HEADER)) {
+                    stripped = stripped.withRemovedHeader(RepeaterLabelFilter.HEADER);
+                }
+                AtorActivityLog.record("HTTP request", request.toolSource(), request, "Passed", "ATOR internal request");
                 return RequestToBeSentAction.continueWith(stripped);
             }
             if (request.hasHeader(COMMAND_HEADER) && controlPlane(request.toolSource())) {
+                AtorActivityLog.record("HTTP request", request.toolSource(), request, "Command", "ATOR command handled locally");
                 return RequestToBeSentAction.spoof(AtorCommands.execute(request));
             }
-            if (!shouldHandle(request.toolSource(), request)) {
-                return RequestToBeSentAction.continueWith(request);
+            boolean repeater = isRepeater(request.toolSource());
+            String labelReason = repeater ? RepeaterLabelFilter.skipReason(request) : null;
+            if (repeater) {
+                if (REPEATER_DECISIONS.size() > 2048) {
+                    REPEATER_DECISIONS.clear();
+                }
+                REPEATER_DECISIONS.put(request.messageId(), labelReason == null ? ALLOWED : labelReason);
             }
-            HttpRequest updated = AtorEngine.apply(request);
-            if (updated != null && updated != request && !updated.toString().equals(request.toString())) {
+            HttpRequest outgoing = request.hasHeader(RepeaterLabelFilter.HEADER)
+                    ? request.withRemovedHeader(RepeaterLabelFilter.HEADER) : request;
+            String skipReason = skipReason(request.toolSource(), outgoing);
+            if (skipReason == null) {
+                skipReason = labelReason;
+            }
+            if (skipReason != null) {
+                AtorActivityLog.record("HTTP request", request.toolSource(), request, "Skipped", skipReason);
+                return RequestToBeSentAction.continueWith(outgoing);
+            }
+            HttpRequest updated = AtorEngine.apply(outgoing);
+            if (updated != null && !updated.toString().equals(outgoing.toString())) {
                 String tool = request.toolSource() == null || request.toolSource().toolType() == null
                         ? "Burp"
                         : request.toolSource().toolType().toString();
                 BurpExtender.log("ATOR updated " + tool + " " + request.method() + " " + request.path());
+                AtorActivityLog.record("HTTP request", request.toolSource(), request, "Updated", "Replacement applied");
+            } else {
+                AtorActivityLog.record("HTTP request", request.toolSource(), request, "Unchanged", "No replacement applied");
             }
-            return RequestToBeSentAction.continueWith(updated == null ? request : updated);
+            return RequestToBeSentAction.continueWith(updated == null ? outgoing : updated);
         } catch (Exception e) {
             BurpExtender.log("ATOR request handler: " + e.getMessage());
-            return RequestToBeSentAction.continueWith(request);
+            AtorActivityLog.record("HTTP request", request.toolSource(), request, "Error", "Handler failed");
+            try {
+                return RequestToBeSentAction.continueWith(request.hasHeader(RepeaterLabelFilter.HEADER)
+                        ? request.withRemovedHeader(RepeaterLabelFilter.HEADER) : request);
+            } catch (RuntimeException stripError) {
+                BurpExtender.log("ATOR could not remove Repeater label header: " + stripError.getMessage());
+                return RequestToBeSentAction.drop();
+            }
         }
     }
 
     @Override
     public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived response) {
         try {
+            String repeaterDecision = REPEATER_DECISIONS.remove(response.messageId());
             if (inCall() || response.hasHeader(MACRO_HEADER)) {
                 return ResponseReceivedAction.continueWith(response);
             }
@@ -83,22 +118,34 @@ public final class AtorHttpHandler implements HttpHandler {
             if (initiating != null && initiating.hasHeader(COMMAND_HEADER)) {
                 return ResponseReceivedAction.continueWith(response);
             }
-            if (!shouldHandle(response.toolSource(), initiating)) {
+            String skipReason = skipReason(response.toolSource(), initiating);
+            if (skipReason == null && isRepeater(response.toolSource())
+                    && (repeaterDecision != null || RepeaterLabelFilter.isEnabled())) {
+                skipReason = repeaterDecision == null ? "Repeater label decision unavailable"
+                        : ALLOWED.equals(repeaterDecision) ? null : repeaterDecision;
+            }
+            if (skipReason != null) {
+                AtorActivityLog.record("HTTP response", response.toolSource(), initiating, "Skipped", skipReason);
                 return ResponseReceivedAction.continueWith(response);
             }
             if (!CheckCondition.matches(response)) {
+                AtorActivityLog.record("HTTP response", response.toolSource(), initiating, "Unchanged", "Error condition not met");
                 return ResponseReceivedAction.continueWith(response);
             }
             HttpResponse refreshed = AtorEngine.refreshAndRetry(initiating);
             if (refreshed == null) {
+                AtorActivityLog.record("HTTP response", response.toolSource(), initiating, "Unchanged", "Refresh did not return a response");
                 return ResponseReceivedAction.continueWith(response);
             }
+            AtorActivityLog.record("HTTP response", response.toolSource(), initiating, "Refreshed", "Error condition met; retried request");
             Annotations notes = response.annotations() == null
                     ? Annotations.annotations("ATOR refreshed this response")
                     : response.annotations().withNotes("ATOR refreshed this response");
             return ResponseReceivedAction.continueWith(refreshed, notes);
         } catch (Exception e) {
             BurpExtender.log("ATOR response handler: " + e.getMessage());
+            AtorActivityLog.record("HTTP response", response.toolSource(), response.initiatingRequest(),
+                    "Error", "Handler failed; original response passed");
             return ResponseReceivedAction.continueWith(response);
         }
     }
@@ -111,23 +158,27 @@ public final class AtorHttpHandler implements HttpHandler {
         return tool == ToolType.EXTENSIONS || tool == ToolType.BURP_AI || tool == ToolType.REPEATER;
     }
 
-    private static boolean shouldHandle(ToolSource source, HttpRequest request) {
+    private static boolean isRepeater(ToolSource source) {
+        return source != null && source.toolType() == ToolType.REPEATER;
+    }
+
+    private static String skipReason(ToolSource source, HttpRequest request) {
         if (PreviewPanel.isPreviewEnabled) {
-            return false;
+            return "Preview enabled";
         }
         if (source == null || !SetttingsTab.isToolEnabled(source.toolType())) {
-            return false;
+            return "Tool disabled";
         }
         if (SetttingsTab.inScope != null && SetttingsTab.inScope.isSelected()) {
             try {
                 if (request == null || !request.isInScope()) {
-                    return false;
+                    return "Out of scope";
                 }
             } catch (Exception e) {
-                return false;
+                return "Scope check failed";
             }
         }
-        return domainAllowed(request);
+        return domainAllowed(request) ? null : "Domain not selected";
     }
 
     static boolean domainAllowed(HttpRequest request) {

@@ -69,42 +69,35 @@ public class HttpRequestResponseImpl implements IHttpRequestResponse{
 		this.iHttpService = httpService;
 	}
 
-	@Override
 	public String getHost() {
 		return iHttpService == null ? null : iHttpService.getHost();
 	}
 
-	@Override
 	public int getPort() {
 		return iHttpService == null ? 0 : iHttpService.getPort();
 	}
 
-	@Override
 	public String getProtocol() {
 		return iHttpService == null ? null : iHttpService.getProtocol();
 	}
 
-	@Override
 	public void setHost(String host) {
 		int port = getPort();
 		String protocol = getProtocol() == null ? "http" : getProtocol();
 		this.iHttpService = new IHttpServiceImpl(host, port, protocol);
 	}
 
-	@Override
 	public void setPort(int port) {
 		String host = getHost() == null ? "" : getHost();
 		String protocol = getProtocol() == null ? "http" : getProtocol();
 		this.iHttpService = new IHttpServiceImpl(host, port, protocol);
 	}
 
-	@Override
 	public void setProtocol(String protocol) {
 		String host = getHost() == null ? "" : getHost();
 		this.iHttpService = new IHttpServiceImpl(host, getPort(), protocol);
 	}
 
-	@Override
 	public URL getUrl() {
 		if (iHttpService == null || iHttpService.getHost() == null) {
 			return null;
@@ -127,7 +120,6 @@ public class HttpRequestResponseImpl implements IHttpRequestResponse{
 		}
 	}
 
-	@Override
 	public short getStatusCode() {
 		if (response == null || response.length < 12) {
 			return 0;

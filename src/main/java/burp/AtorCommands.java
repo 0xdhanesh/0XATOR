@@ -75,6 +75,8 @@ public final class AtorCommands {
         root.putBoolean("inScopeOnly", SetttingsTab.inScope != null && SetttingsTab.inScope.isSelected());
         root.putBoolean("domainsEnabled", DomainFilter.isEnabled());
         root.put("domains", domainNodes());
+        root.putString("repeaterLabelRegex", RepeaterLabelFilter.regex());
+        root.putString("repeaterLabelHeader", RepeaterLabelFilter.HEADER);
         root.putString("trigger", PreviewPanel.conditionDetails == null ? "" : PreviewPanel.conditionDetails.getText());
         root.put("tools", tools());
         root.put("extractions", extractions(includeValues));

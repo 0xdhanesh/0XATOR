@@ -51,6 +51,7 @@ public class ExportATOR {
 		jsonObject.put("errorConditionReplacement", getErrorConditionReplacement());
 		jsonObject.put("domains", domainArray());
 		jsonObject.put("domainsEnabled", DomainFilter.isEnabled());
+		jsonObject.put("repeaterLabelRegex", RepeaterLabelFilter.regex());
 		
 		return jsonObject;
 	}
