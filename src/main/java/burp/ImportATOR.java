@@ -59,6 +59,23 @@ public class ImportATOR {
 		JSONObject errorConditionReplacement = (JSONObject) jsonObject.get("errorConditionReplacement");
 		parseErrorConditionReplacement(errorConditionReplacement);
 		parseDomains(jsonObject);
+		parseRepeaterRegex(jsonObject);
+	}
+
+	private void parseRepeaterRegex(JSONObject jsonObject) {
+		if (!jsonObject.containsKey("repeaterLabelRegex")) {
+			return;
+		}
+		Object value = jsonObject.get("repeaterLabelRegex");
+		if (!(value instanceof String)) {
+			callbacks.printOutput("ATOR Repeater label regex must be a string; setting was left unchanged.");
+			return;
+		}
+		try {
+			RepeaterLabelFilter.setRegex((String) value);
+		} catch (java.util.regex.PatternSyntaxException e) {
+			callbacks.printOutput("ATOR Repeater label regex was invalid; setting was left unchanged: " + e.getDescription());
+		}
 	}
 
 	private void parseDomains(JSONObject jsonObject) {

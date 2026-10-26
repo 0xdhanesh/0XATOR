@@ -2,14 +2,32 @@
 
 ATOR is a Burp Suite extension that obtains tokens from a recorded macro and replaces them in later requests. It covers access and refresh tokens in headers, cookies, the URL, and XML, JSON, or form bodies.
 
-Version 2.4.2 keeps the 2.4.1 Montoya HTTP path and adds a domain list. Leave the list empty and ATOR still handles every host. Add one or more hosts and ATOR obtains and replaces tokens only for those domains.
+For setup, workflows, and the Burp MCP tool and command reference, see [USAGE.md](USAGE.md).
+
+Version 2.5 adds an activity log and a Repeater label regex to the Montoya HTTP path and domain controls introduced in 2.4.2.
 
 The original idea comes from [ExtendedMacro](https://github.com/FrUh/ExtendedMacro).
+
+## What 2.5 changes
+
+The **Activity** tab shows the latest 500 ATOR decisions: time, hook, Burp tool, HTTP method, host, outcome, and reason. It records when requests are updated or skipped, when a response triggers a refresh, and when a session rule runs. It stays in memory and can be cleared from the tab. It does not store bodies, token values, header values, or paths.
+
+Settings guidance wraps as plain text in Burp, so domain and Repeater instructions stay readable with themes that display HTML labels literally.
+
+To limit ATOR to selected Repeater requests, open **Settings → Repeater labels**, enter a Java regex such as `dhanesh`, and click **Save regex**. In each Repeater request that should use ATOR, add a header such as:
+
+```http
+X-ATOR-Repeater-Tab: validation-dhanesh-for-123
+```
+
+ATOR removes that header before the request is sent. The regex uses a substring match, so `dhanesh` matches the example label. With a regex set, Repeater requests with a missing or nonmatching label are passed through without token replacement or error-triggered retry. Clear the regex to restore the previous behavior for all Repeater requests. The Repeater tool checkbox must still be enabled. The regex is saved in Burp preferences and included in ATOR export and import; older exports leave it unchanged. The `status` command includes `repeaterLabelRegex` and `repeaterLabelHeader`.
+
+Burp's [Montoya API does not expose existing Repeater tab titles](https://github.com/PortSwigger/burp-extensions-montoya-api/issues/139), so ATOR cannot automatically use a tab's visible name. Add or change the label in the request editor when you rename a tab. The `ATOR` session handling action also cannot see its source tool; while a Repeater label regex is set, it requires a matching label for any session-rule invocation. The live HTTP handler continues to handle other enabled tools normally.
 
 ## What 2.4.2 changes
 
 - **Settings → Domains.** Type a host and press Add. `*.example.com` includes that domain and its subdomains. `host:port` pins a port. **Only selected domains** turns the filter on. Clear the list to handle every host again.
-- **Send to ATOR v2.4.2 → 3. Add domain.** The host of each selected message is added and the filter turns on.
+- **Send to ATOR → 3. Add domain.** The host of each selected message is added and the filter turns on.
 - `X-ATOR-Command: domains` replaces the list. The body is a JSON array, `{"domains":["api.example.com","*.lab.local"]}`, or one host per line. `{"domains":[]}` handles every host again. `{"enabled":false}` keeps the list and handles every host.
 - Export and import include `domains` and `domainsEnabled`. An older export file without those keys leaves the current list as it is.
 
@@ -40,7 +58,7 @@ Other behavior in this build:
 The extension logs this line when both the legacy and Montoya entry points have run:
 
 ```text
-ATOR v2.4.2 loaded for Burp 2026.8 (Montoya HTTP handler, HTTP/2 safe).
+ATOR v2.5.2 loaded for Burp 2026.8 (Montoya HTTP handler, HTTP/2 safe).
 ```
 
 ## How a request is handled
@@ -49,7 +67,7 @@ ATOR v2.4.2 loaded for Burp 2026.8 (Montoya HTTP handler, HTTP/2 safe).
 2. Each replacement rule locates the current token (URL, JSON or multipart body, or header) and writes the stored value into that section.
 3. When the response matches the configured error condition, ATOR runs the obtain macro again, rebuilds the original request, sends it, and returns that response to the tool. The message note is `ATOR refreshed this response`.
 
-The handler skips the request when Preview is on, the tool checkbox is off, **InScope** is on and the request is out of scope, or **Only selected domains** is on and the host is not in the domain list. A handler exception is logged and the original message continues.
+The handler skips the request when Preview is on, the tool checkbox is off, **InScope** is on and the request is out of scope, **Only selected domains** is on and the host is not in the domain list, or a configured Repeater label regex does not match. A handler exception is logged; ATOR passes the request through after removing its label header.
 
 The session action only does steps 1 and 2. The error-triggered retry stays on the HTTP handler.
 
@@ -59,24 +77,24 @@ burp-mcp has no separate ATOR invoke API. Send a normal request with `send_http1
 
 | Command | Body | Result |
 | --- | --- | --- |
-| `status` | empty | JSON snapshot. Extraction values are included. |
+| `status` | empty | JSON snapshot. Extraction names and presence are included; values are withheld. |
 | `refresh` | empty | Runs the obtain macro, then the same snapshot as `status`. |
 | `export` | empty | `{ "ok": true, "action": "export", "config": "<ATOR export JSON>" }`. `config` is the same document the Settings **Export ATOR** button writes. |
 | `import` | ATOR export JSON | Loads error conditions, obtain steps, and replacement rules on the Swing thread. The response is a `status` snapshot without extraction values. A `domains` array in the document replaces the domain list. |
 | `domains` | JSON array, `{"domains":[...]}`, or one host per line | Replaces the domain list. `{"domains":[]}` handles every host. `{"enabled":false}` keeps the saved hosts and handles every host. The response is a `status` snapshot without extraction values. |
 
-Unknown commands return HTTP 400. A failed command returns HTTP 500 with `{ "ok": false, "error": "..." }`. Responses use `Content-Type: application/json` and `X-ATOR: 1`.
+Unknown commands return HTTP 400, and command exceptions return HTTP 500. Some invalid bodies return HTTP 200 with `{ "ok": false, "error": "..." }`, so check `ok` as well as the HTTP status. Responses use `Content-Type: application/json` and `X-ATOR: 1`.
 
 `status` fields:
 
-- `extension`, `version` (`2.4.2`), `sessionHandlingAction` (`ATOR`)
+- `extension`, `version` (`2.5.2`), `sessionHandlingAction` (`ATOR`)
 - `preview`, `inScopeOnly`, `domainsEnabled`, `domains` (the host list), `trigger` (the condition expression from Preview)
 - `tools`: Repeater, Intruder, Scanner, Sequencer, Proxy, Extensions, Burp AI, each with `enabled`
-- `extractions`: `name`, `present`, `length`, and `value` when `present` is true
+- `extractions`: `name` and `present`; token values and lengths are withheld
 - `obtainSteps`, `replacements`, `errorConditions`
 - `commandHeader`, `commands`
 
-Example status call. The host is unused because the request is answered inside the extension:
+Example status call. ATOR answers it inside the extension, though Burp MCP can still check its target host permission first:
 
 ```http
 GET /ator HTTP/1.1
@@ -117,19 +135,32 @@ Requirements:
 
 - JDK 17 (the compiler `release` is 17)
 - Maven
-- Burp Suite 2026.8. The compile dependency is Montoya API `2026.7`, scope `provided`, so it is not packed into the jar.
+- Burp Suite 2026.8. The Montoya API `2026.7` and legacy Burp Extender API `2.3` are compile dependencies with `provided` scope, so they are not packed into the jar.
 
 ```bash
 mvn clean package
 ```
 
-Load the jar with dependencies from `target/` in **Extensions > Add > Java**. `BappManifest.bmf` names the extension **Authentication Token Obtain and Replace**, screen version `2.4.2`, and lists the BApp entry point as `bin/ATOR-v2.4.2.jar`. Rebuild before relying on the copy under `bin/`.
+Load `.localdev/target/ATOR-v2.5.2-jar-with-dependencies.jar` in **Extensions > Add > Java** after building. Maven keeps compiled classes and JARs in the ignored `.localdev/target/` folder. `BappManifest.bmf` names the extension **Authentication Token Obtain and Replace**, screen version `2.5.2`, and points to that generated JAR.
 
-`mvn clean install` matches the manifest `BuildCommand` and also installs the artifact locally.
+`mvn clean package` is also the manifest `BuildCommand`.
+
+### GitHub Releases
+
+Pushing a version tag runs [the release workflow](.github/workflows/release.yml). GitHub checks out that tag, compiles with Java 17 into `.localdev/target/`, and publishes `ATOR-<tag>.jar` plus its SHA-256 file in the repository's Releases section. The workflow checks that the tag matches the version in `pom.xml` by requiring the corresponding Maven artifact name; a mismatch stops the release. The older v2.5 release does not include token-free status responses.
+
+For the next version, update the version in the POM, source, and manifest, merge the release source, then tag that commit and push the tag. For example, for v2.6:
+
+```bash
+git tag v2.6
+git push origin v2.6
+```
+
+The GitHub Release JAR is compiled from tagged source. Compiled JARs stay out of Git.
 
 ## Configure ATOR
 
-The suite tab is **ATOR v2.4.2**. It has two sections: **ATOR Configuration** and **Settings**.
+The suite tab is **ATOR v2.5.2**. It has three sections: **ATOR Configuration**, **Settings**, and **Activity**.
 
 Configuration has four steps:
 
@@ -138,7 +169,7 @@ Configuration has four steps:
 3. **Error Condition Replacement.** Where those values are written on the next request.
 4. **Preview.** Dry-run the replacement. While Preview is enabled, live traffic is not modified.
 
-Add messages from Proxy history with **Send to ATOR v2.4.2**, then choose **1. Error Condition**, **2. ATOR Macro (Obtain Token)**, or **3. Add domain**.
+Add messages from Proxy history with **Send to ATOR**, then choose **1. Error Condition**, **2. ATOR Macro (Obtain Token)**, or **3. Add domain**.
 
 ### Error condition
 
@@ -164,6 +195,7 @@ Extraction names can request URL encode or decode. A name that starts with `jwt`
 - Tool checkboxes choose which Burp tools the live handler updates. **All/None** toggles every checkbox, including **InScope**.
 - **InScope** limits replacement and refresh to in-scope requests.
 - **Domains** limits replacement and refresh to the hosts you add. With the list empty, or with **Only selected domains** unchecked, ATOR handles every host.
+- **Repeater labels** limits Repeater replacement and refresh to requests carrying a matching `X-ATOR-Repeater-Tab` value. An empty regex disables this limit.
 - **Export ATOR** and **Import ATOR** read and write the same JSON that the `export` and `import` commands use, including the domain list.
 
 ## Walkthrough with Tiredful
@@ -187,7 +219,7 @@ Watch the obtain and retry traffic in Logger++ or the extension output. A second
 
 ## Version
 
-2.4.2
+2.5
 
 ## Authors
 

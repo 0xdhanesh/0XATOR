@@ -33,13 +33,13 @@ public final class AtorCommands {
         try {
             switch (command) {
                 case "status":
-                    JsonObjectNode current = status(true);
+                    JsonObjectNode current = status();
                     current.putBoolean("ok", true);
                     current.putString("action", "status");
                     return json(200, current.toJsonString());
                 case "refresh":
                     AtorEngine.runObtain();
-                    JsonObjectNode refreshed = status(true);
+                    JsonObjectNode refreshed = status();
                     refreshed.putBoolean("ok", true);
                     refreshed.putString("action", "refresh");
                     return json(200, refreshed.toJsonString());
@@ -66,7 +66,7 @@ public final class AtorCommands {
         }
     }
 
-    private static JsonObjectNode status(boolean includeValues) {
+    private static JsonObjectNode status() {
         JsonObjectNode root = jsonObjectNode();
         root.putString("extension", "ATOR");
         root.putString("version", BurpExtender.VERSION);
@@ -75,9 +75,11 @@ public final class AtorCommands {
         root.putBoolean("inScopeOnly", SetttingsTab.inScope != null && SetttingsTab.inScope.isSelected());
         root.putBoolean("domainsEnabled", DomainFilter.isEnabled());
         root.put("domains", domainNodes());
+        root.putString("repeaterLabelRegex", RepeaterLabelFilter.regex());
+        root.putString("repeaterLabelHeader", RepeaterLabelFilter.HEADER);
         root.putString("trigger", PreviewPanel.conditionDetails == null ? "" : PreviewPanel.conditionDetails.getText());
         root.put("tools", tools());
-        root.put("extractions", extractions(includeValues));
+        root.put("extractions", extractions());
         root.putNumber("obtainSteps", ObtainPanel.obtainEntrylist.size());
         root.putNumber("replacements", ReplacePanel.replaceEntrylist.size());
         root.putNumber("errorConditions", ErrorPanel.errorEntrylist.size());
@@ -105,7 +107,7 @@ public final class AtorCommands {
         tools.add(tool);
     }
 
-    private static JsonArrayNode extractions(boolean includeValues) {
+    private static JsonArrayNode extractions() {
         JsonArrayNode list = jsonArrayNode();
         synchronized (ObtainPanel.extractionEntrylist) {
             for (ExtractionEntry entry : ObtainPanel.extractionEntrylist) {
@@ -113,10 +115,6 @@ public final class AtorCommands {
                 item.putString("name", entry.getName() == null ? "" : entry.getName());
                 boolean present = entry.value != null && !entry.value.isEmpty() && !AtorEngine.isSentinel(entry.value);
                 item.putBoolean("present", present);
-                item.putNumber("length", entry.value == null ? 0 : entry.value.length());
-                if (includeValues && present) {
-                    item.putString("value", entry.value);
-                }
                 list.add(item);
             }
         }
@@ -155,7 +153,7 @@ public final class AtorCommands {
         } else {
             SwingUtilities.invokeAndWait(task);
         }
-        JsonObjectNode wrapper = status(false);
+        JsonObjectNode wrapper = status();
         wrapper.putBoolean("ok", true);
         wrapper.putString("action", "import");
         return wrapper.toJsonString();
@@ -180,7 +178,7 @@ public final class AtorCommands {
         } else {
             SwingUtilities.invokeAndWait(task);
         }
-        JsonObjectNode wrapper = status(false);
+        JsonObjectNode wrapper = status();
         wrapper.putBoolean("ok", true);
         wrapper.putString("action", "domains");
         return wrapper.toJsonString();

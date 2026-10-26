@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -16,6 +17,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
@@ -36,6 +38,8 @@ public class SetttingsTab {
     private static JTextField domainField;
     private static JLabel domainStatus;
     private static JLabel domainError;
+    private JTextField repeaterRegexField;
+    private JLabel repeaterRegexStatus;
     private static boolean domainListenerRegistered;
     static Color BURP_ORANGE = new Color(229, 137, 0);
     private Font headerFont = new Font("Nimbus", Font.BOLD, 13);
@@ -118,11 +122,9 @@ public class SetttingsTab {
         domainHeader.setFont(headerFont);
         domainHeader.setBorder(new EmptyBorder(5, 0, 5, 0));
 
-        JLabel domainHelp = new JLabel("<html><body style='width:520px'>Add one or more hosts and ATOR updates only those domains. "
-        		+ "*.example.com includes that domain and its subdomains. host:port pins a port. "
-        		+ "Clear the list to handle every host again.</body></html>");
-        domainHelp.setAlignmentX(Component.LEFT_ALIGNMENT);
-        domainHelp.setBorder(new EmptyBorder(0, 0, 8, 0));
+        JTextArea domainHelp = helpText("Add one or more hosts and ATOR updates only those domains. "
+                + "*.example.com includes that domain and its subdomains. host:port pins a port. "
+                + "Clear the list to handle every host again.", 56);
 
         onlyDomains = new JCheckBox("Only selected domains", false);
         onlyDomains.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -223,6 +225,31 @@ public class SetttingsTab {
         confPanel.add(domainStatus);
         confPanel.add(domainError);
 
+        JLabel repeaterHeader = new JLabel("Repeater labels");
+        repeaterHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
+        repeaterHeader.setForeground(BURP_ORANGE);
+        repeaterHeader.setFont(headerFont);
+        repeaterHeader.setBorder(new EmptyBorder(12, 0, 5, 0));
+        JTextArea repeaterHelp = helpText("Set a regex to allow ATOR only for Repeater requests "
+                + "with a matching X-ATOR-Repeater-Tab header. Add the label to each desired Repeater tab's request. "
+                + "ATOR removes the header before sending. Burp's API does not expose Repeater tab titles.", 72);
+        repeaterRegexField = new JTextField(28);
+        repeaterRegexField.setText(RepeaterLabelFilter.regex());
+        RepeaterLabelFilter.setListener(() -> repeaterRegexField.setText(RepeaterLabelFilter.regex()));
+        JButton saveRepeaterRegex = new JButton("Save regex");
+        saveRepeaterRegex.addActionListener(event -> saveRepeaterRegex());
+        repeaterRegexField.addActionListener(event -> saveRepeaterRegex());
+        JPanel repeaterRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        repeaterRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        repeaterRow.add(repeaterRegexField);
+        repeaterRow.add(saveRepeaterRegex);
+        repeaterRegexStatus = new JLabel("Leave blank to allow all Repeater requests when the tool is enabled.");
+        repeaterRegexStatus.setAlignmentX(Component.LEFT_ALIGNMENT);
+        confPanel.add(repeaterHeader);
+        confPanel.add(repeaterHelp);
+        confPanel.add(repeaterRow);
+        confPanel.add(repeaterRegexStatus);
+
         confPanel.add(importconfig);
         confPanel.add(importPanel);
         confPanel.add(exportconfig);
@@ -243,6 +270,36 @@ public class SetttingsTab {
             DomainFilter.setListener(this::reloadDomains);
         }
         reloadDomains();
+    }
+
+    private void saveRepeaterRegex() {
+        try {
+            RepeaterLabelFilter.setRegex(repeaterRegexField.getText());
+            repeaterRegexStatus.setForeground(new Color(0, 110, 35));
+            repeaterRegexStatus.setText(RepeaterLabelFilter.isEnabled()
+                    ? "Saved. Only matching labelled Repeater requests are handled."
+                    : "Disabled. All Repeater requests are eligible.");
+        } catch (PatternSyntaxException e) {
+            repeaterRegexStatus.setForeground(new Color(180, 30, 30));
+            repeaterRegexStatus.setText("Invalid regex: " + e.getDescription());
+        }
+    }
+
+    private static JTextArea helpText(String text, int height) {
+        JTextArea area = new JTextArea(text);
+        JLabel label = new JLabel();
+        area.setFont(label.getFont());
+        area.setForeground(label.getForeground());
+        area.setEditable(false);
+        area.setFocusable(false);
+        area.setOpaque(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setAlignmentX(Component.LEFT_ALIGNMENT);
+        area.setBorder(new EmptyBorder(0, 0, 8, 0));
+        area.setPreferredSize(new Dimension(0, height));
+        area.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
+        return area;
     }
 
     private void reloadDomains() {
