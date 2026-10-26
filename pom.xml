@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>StableRelease</groupId>
   <artifactId>ATOR</artifactId>
-  <version>v2.5</version>
+  <version>v2.5.2</version>
   <packaging>jar</packaging>
 
   <properties>

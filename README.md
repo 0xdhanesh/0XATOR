@@ -58,7 +58,7 @@ Other behavior in this build:
 The extension logs this line when both the legacy and Montoya entry points have run:
 
 ```text
-ATOR v2.5 loaded for Burp 2026.8 (Montoya HTTP handler, HTTP/2 safe).
+ATOR v2.5.2 loaded for Burp 2026.8 (Montoya HTTP handler, HTTP/2 safe).
 ```
 
 ## How a request is handled
@@ -77,7 +77,7 @@ burp-mcp has no separate ATOR invoke API. Send a normal request with `send_http1
 
 | Command | Body | Result |
 | --- | --- | --- |
-| `status` | empty | JSON snapshot. Extraction values are included. |
+| `status` | empty | JSON snapshot. Extraction names and presence are included; values are withheld. |
 | `refresh` | empty | Runs the obtain macro, then the same snapshot as `status`. |
 | `export` | empty | `{ "ok": true, "action": "export", "config": "<ATOR export JSON>" }`. `config` is the same document the Settings **Export ATOR** button writes. |
 | `import` | ATOR export JSON | Loads error conditions, obtain steps, and replacement rules on the Swing thread. The response is a `status` snapshot without extraction values. A `domains` array in the document replaces the domain list. |
@@ -87,10 +87,10 @@ Unknown commands return HTTP 400, and command exceptions return HTTP 500. Some i
 
 `status` fields:
 
-- `extension`, `version` (`2.5`), `sessionHandlingAction` (`ATOR`)
+- `extension`, `version` (`2.5.2`), `sessionHandlingAction` (`ATOR`)
 - `preview`, `inScopeOnly`, `domainsEnabled`, `domains` (the host list), `trigger` (the condition expression from Preview)
 - `tools`: Repeater, Intruder, Scanner, Sequencer, Proxy, Extensions, Burp AI, each with `enabled`
-- `extractions`: `name`, `present`, `length`, and `value` when `present` is true
+- `extractions`: `name` and `present`; token values and lengths are withheld
 - `obtainSteps`, `replacements`, `errorConditions`
 - `commandHeader`, `commands`
 
@@ -141,13 +141,13 @@ Requirements:
 mvn clean package
 ```
 
-Load `.localdev/target/ATOR-v2.5-jar-with-dependencies.jar` in **Extensions > Add > Java** after building. Maven keeps compiled classes and JARs in the ignored `.localdev/target/` folder. `BappManifest.bmf` names the extension **Authentication Token Obtain and Replace**, screen version `2.5`, and points to that generated JAR.
+Load `.localdev/target/ATOR-v2.5.2-jar-with-dependencies.jar` in **Extensions > Add > Java** after building. Maven keeps compiled classes and JARs in the ignored `.localdev/target/` folder. `BappManifest.bmf` names the extension **Authentication Token Obtain and Replace**, screen version `2.5.2`, and points to that generated JAR.
 
 `mvn clean package` is also the manifest `BuildCommand`.
 
 ### GitHub Releases
 
-Pushing a version tag runs [the release workflow](.github/workflows/release.yml). GitHub checks out that tag, compiles with Java 17 into `.localdev/target/`, and publishes `ATOR-<tag>.jar` plus its SHA-256 file in the repository's Releases section. The workflow checks that the tag matches the version in `pom.xml` by requiring the corresponding Maven artifact name; a mismatch stops the release. [The v2.5 JAR is already available](https://github.com/0xdhanesh/ATOR-Rewamped/releases/tag/v2.5).
+Pushing a version tag runs [the release workflow](.github/workflows/release.yml). GitHub checks out that tag, compiles with Java 17 into `.localdev/target/`, and publishes `ATOR-<tag>.jar` plus its SHA-256 file in the repository's Releases section. The workflow checks that the tag matches the version in `pom.xml` by requiring the corresponding Maven artifact name; a mismatch stops the release. The older v2.5 release does not include token-free status responses.
 
 For the next version, update the version in the POM, source, and manifest, merge the release source, then tag that commit and push the tag. For example, for v2.6:
 
@@ -160,7 +160,7 @@ The GitHub Release JAR is compiled from tagged source. Compiled JARs stay out of
 
 ## Configure ATOR
 
-The suite tab is **ATOR v2.5**. It has three sections: **ATOR Configuration**, **Settings**, and **Activity**.
+The suite tab is **ATOR v2.5.2**. It has three sections: **ATOR Configuration**, **Settings**, and **Activity**.
 
 Configuration has four steps:
 
@@ -169,7 +169,7 @@ Configuration has four steps:
 3. **Error Condition Replacement.** Where those values are written on the next request.
 4. **Preview.** Dry-run the replacement. While Preview is enabled, live traffic is not modified.
 
-Add messages from Proxy history with **Send to ATOR v2.5**, then choose **1. Error Condition**, **2. ATOR Macro (Obtain Token)**, or **3. Add domain**.
+Add messages from Proxy history with **Send to ATOR**, then choose **1. Error Condition**, **2. ATOR Macro (Obtain Token)**, or **3. Add domain**.
 
 ### Error condition
 

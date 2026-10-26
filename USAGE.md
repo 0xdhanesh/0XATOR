@@ -4,9 +4,9 @@ ATOR obtains authentication values from a recorded Burp macro and replaces stale
 
 ## Load and configure the extension
 
-Download `ATOR-v2.5.jar` from the [v2.5 release](https://github.com/0xdhanesh/ATOR-Rewamped/releases/tag/v2.5), or run `mvn clean package` and load `.localdev/target/ATOR-v2.5-jar-with-dependencies.jar`. In Burp, open **Extensions > Installed > Add**, select **Java**, and choose the JAR.
+Build this source with `mvn clean package` and load `.localdev/target/ATOR-v2.5.2-jar-with-dependencies.jar`. In Burp, open **Extensions > Installed > Add**, select **Java**, and choose the JAR. The older v2.5 release returns extracted values in its status response.
 
-In the **ATOR v2.5** suite tab:
+In the **ATOR v2.5.2** suite tab:
 
 1. In **ATOR Configuration**, record the response that indicates an expired token under **Error Condition**.
 2. Add the login or refresh request under **Obtain Token** and define the values to extract from its response.
@@ -92,7 +92,7 @@ The command header is accepted only when Burp reports the tool as **Extensions**
 
 | `X-ATOR-Command` value | Request body | Action and result |
 | --- | --- | --- |
-| `status` | Empty | Return `ok: true` and a configuration/status snapshot, including current extraction values when present. |
+| `status` | Empty | Return `ok: true` and a configuration/status snapshot with extraction names and presence, without values. |
 | `refresh` | Empty | Run the obtain macro immediately, then return a status snapshot. |
 | `export` | Empty | Return an object whose `config` field contains the ATOR export JSON as a string. |
 | `import` | The ATOR export JSON document itself | Load error conditions, obtain steps, replacements, domains, and Repeater regex from the document. Send the value of `config` from `export`, without its response wrapper. |
@@ -106,7 +106,7 @@ For example, pass this body with `X-ATOR-Command: domains` to limit ATOR to two 
 
 The status response includes `preview`, `inScopeOnly`, `domainsEnabled`, `domains`, `repeaterLabelRegex`, `repeaterLabelHeader`, enabled `tools`, extraction state, rule counts, and available command names. Check its `ok` field as well as the HTTP status: unknown commands return 400, runtime failures return 500, and some input validation errors return `ok: false` in a 200 response.
 
-`status` and `refresh` can return extracted token values. `export` can include recorded HTTP messages and authentication data. Handle those responses as sensitive configuration data.
+`status` and `refresh` report extraction names and presence without token values or lengths. `export` can include recorded HTTP messages and authentication data; use it only through the trusted Burp UI and treat the output as sensitive configuration data.
 
 ## Check what happened
 
